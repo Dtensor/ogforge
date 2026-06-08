@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Successful — ogforge{% endblock %}
+
+{% block content %}
+<section class="success-section">
+    <div class="success-container">
+        <div class="success-card">
+            <h1 class="success-title">✓ Payment Successful</h1>
+            <p class="success-message">Thank you for upgrading to Pro!</p>
+            <p class="success-details">
+                We've received your payment. Your account will be activated shortly when our webhook confirms the subscription.
+                You'll get access to:
+            </p>
+            <ul class="success-benefits">
+                <li>5,000 images per month</li>
+                <li>Remove watermarks</li>
+                <li>Custom colors on all templates</li>
+            </ul>
+            <p class="success-footer">
+                In the meantime, return to your <a href="/dashboard" class="link">dashboard</a> to start generating images.
+            </p>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — ogforge{% endblock %}
+
+{% block content %}
+<section class="dashboard-section">
+    <div class="dashboard-container">
+        <h1>Dashboard</h1>
+
+        {% if msg %}
+            <div class="alert alert-info">{{ msg }}</div>
+        {% endif %}
+        {% if error %}
+            <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <div class="dashboard-grid">
+            <!-- Account Info -->
+            <div class="dashboard-card">
+                <h2>Account</h2>
+                <div class="account-info">
+                    <p><strong>Email:</strong> {{ email }}</p>
+                    <p><strong>Plan:</strong> <span class="plan-badge plan-badge-{{ plan }}">{{ plan_label }}</span></p>
+                </div>
+            </div>
+
+            <!-- API Key -->
+            <div class="dashboard-card">
+                <h2>API Key</h2>
+                <p class="api-key-label">Your active key:</p>
+                <code class="api-key">{{ api_key }}</code>
+                <form method="post" action="/dashboard/regenerate-key" class="regenerate-form">
+                    <button type="submit" class="btn btn-secondary btn-small">Regenerate Key</button>
+                </form>
+            </div>
+
+            <!-- Usage -->
+            <div class="dashboard-card">
+                <h2>Monthly Usage</h2>
+                <div class="usage-info">
+                    <p><strong>{{ used }} / {{ limit }}</strong> images generated</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ (used / limit * 100) | int }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sample Image -->
+            <div class="dashboard-card">
+                <h2>Sample Image</h2>
+                <img src="{{ sample_url }}" alt="Sample OG image" class="sample-image">
+            </div>
+
+            <!-- cURL Example -->
+            <div class="dashboard-card">
+                <h2>Try It Out</h2>
+                <pre class="curl-snippet">{{ curl_snippet }}</pre>
+            </div>
+
+            <!-- Upgrade Button -->
+            {% if plan == 'free' %}
+            <div class="dashboard-card">
+                <h2>Upgrade to Pro</h2>
+                <p>Get 5,000 images per month, remove watermarks, and unlock custom colors.</p>
+                <form method="post" action="/upgrade">
+                    <button type="submit" class="btn btn-primary">Upgrade to Pro</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

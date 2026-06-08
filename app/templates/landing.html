@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}ogforge — Dynamic Open-Graph Images{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-container">
+        <h1 class="hero-title">Generate Dynamic Social Cards in Seconds</h1>
+        <p class="hero-subtitle">Create stunning Open-Graph images for your links instantly. Perfect for blogs, social media, and APIs.</p>
+        <div class="hero-cta">
+            {% if request.session.get('user_id') %}
+                <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+            {% else %}
+                <a href="/signup" class="btn btn-primary">Get Started Free</a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<section class="features">
+    <div class="features-container">
+        <div class="feature-card">
+            <h3>Easy API</h3>
+            <p>Simple REST endpoint. Just pass a title and subtitle, get a PNG.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Custom Designs</h3>
+            <p>Choose from multiple templates or customize colors on Pro.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Reliable</h3>
+            <p>Production-ready. Fast generation, high uptime.</p>
+        </div>
+    </div>
+</section>
+
+<section class="pricing">
+    <div class="pricing-container">
+        <h2 class="pricing-title">Simple, Transparent Pricing</h2>
+        <div class="pricing-cards">
+            {% for key, plan in plans.items() %}
+            <div class="pricing-card {% if key == 'pro' %}pricing-card-featured{% endif %}">
+                <h3 class="plan-label">{{ plan.label }}</h3>
+                <p class="plan-price">{{ plan.price_display }}</p>
+                <ul class="plan-features">
+                    <li><strong>{{ plan.monthly_limit }}</strong> images/month</li>
+                    <li>{% if plan.watermark %}Watermarked{% else %}No watermark{% endif %}</li>
+                    <li>{% if plan.custom_colors %}Custom colors{% else %}Fixed colors{% endif %}</li>
+                </ul>
+                {% if request.session.get('user_id') %}
+                    <a href="/dashboard" class="btn btn-secondary">View Dashboard</a>
+                {% else %}
+                    <a href="/signup" class="btn btn-secondary">Sign Up</a>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}
