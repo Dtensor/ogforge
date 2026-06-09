@@ -57,13 +57,22 @@
                 <pre class="curl-snippet">{{ curl_snippet }}</pre>
             </div>
 
-            <!-- Upgrade Button -->
+            <!-- Upgrade / Pro status -->
             {% if plan == 'free' %}
             <div class="dashboard-card">
                 <h2>Upgrade to Pro</h2>
-                <p>Get 5,000 images per month, remove watermarks, and unlock custom colors.</p>
+                <p>₹750 for 1 month: 5,000 images, no watermarks, and custom colors.</p>
                 <form method="post" action="/upgrade">
-                    <button type="submit" class="btn btn-primary">Upgrade to Pro</button>
+                    <button type="submit" class="btn btn-primary">Upgrade to Pro — ₹750/mo</button>
+                </form>
+            </div>
+            {% elif plan == 'pro' %}
+            <div class="dashboard-card">
+                <h2>Pro is active ✓</h2>
+                {% if pro_until %}<p>Your Pro access runs until <strong>{{ pro_until[:10] }}</strong>.</p>{% endif %}
+                <p>Renew anytime to extend by another month.</p>
+                <form method="post" action="/upgrade">
+                    <button type="submit" class="btn btn-primary">Renew — ₹750/mo</button>
                 </form>
             </div>
             {% endif %}
