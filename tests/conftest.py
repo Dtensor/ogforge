@@ -3,8 +3,15 @@ import os
 import tempfile
 from pathlib import Path
 
-import pytest
-from fastapi.testclient import TestClient
+# Module-level: runs at conftest import (BEFORE test modules import app.config),
+# so the suite never picks up a real .env on disk and Stripe stays disabled.
+os.environ["OGFORGE_DISABLE_DOTENV"] = "1"
+for _k in ("STRIPE_SECRET_KEY", "STRIPE_PUBLISHABLE_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET"):
+    os.environ[_k] = ""
+os.environ.setdefault("SESSION_SECRET", "test-secret-key")
+
+import pytest  # noqa: E402  (must follow the env setup above)
+from fastapi.testclient import TestClient  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

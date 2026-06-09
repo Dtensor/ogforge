@@ -6,7 +6,13 @@ from dataclasses import dataclass
 
 
 def _load_dotenv() -> None:
-    """Tiny .env loader (no python-dotenv dependency). Idempotent; never overrides existing env."""
+    """Tiny .env loader (no python-dotenv dependency). Idempotent; never overrides existing env.
+
+    Skipped entirely when OGFORGE_DISABLE_DOTENV is set, so the test suite stays
+    hermetic even when a real .env (with live keys) exists on disk.
+    """
+    if os.environ.get("OGFORGE_DISABLE_DOTENV"):
+        return
     path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
     if not os.path.exists(path):
         return
