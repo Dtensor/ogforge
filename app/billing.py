@@ -51,6 +51,10 @@ def create_checkout_session(db: sqlite3.Connection, user: dict) -> str:
                 "quantity": 1,
             }
         ],
+        # India compliance: Stripe requires a customer name + billing address on
+        # card transactions for Indian accounts (stripe.com/docs/india-exports).
+        # Harmless elsewhere — Checkout just collects the address everywhere.
+        billing_address_collection="required",
         success_url=f"{settings.base_url}/billing/success",
         cancel_url=f"{settings.base_url}/billing/cancel",
     )
