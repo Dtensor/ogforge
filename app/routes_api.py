@@ -12,6 +12,33 @@ from .db import get_db
 router = APIRouter(prefix="/v1", tags=["api"])
 
 
+@router.get("/sample")
+def get_sample(
+    title: str = "Your headline here",
+    subtitle: str = "",
+    template: str = "gradient",
+) -> Response:
+    """Public, no-auth demo render for the landing page's live preview.
+
+    Always watermarked, no custom colors, title/subtitle length-capped. Not metered —
+    it's a marketing surface, not the product (real generation needs an API key on /v1/og).
+    """
+    png = imaging.render_og_image(
+        title=title[:70],
+        subtitle=subtitle[:90],
+        template=template,
+        bg=None,
+        fg=None,
+        watermark=True,
+    )
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=60"},
+    )
+
+
+
 def _get_api_key(
     authorization: str | None = None,
     key: str | None = Query(None),

@@ -16,14 +16,14 @@ PLANS: dict[str, dict] = {
         "monthly_limit": 50,
         "watermark": True,
         "custom_colors": False,
-        "price_display": "$0",
+        "price_display": "Free",
     },
     "pro": {
         "label": "Pro",
         "monthly_limit": 5000,
         "watermark": False,
         "custom_colors": True,
-        "price_display": "$9/mo",
+        "price_display": "₹750/mo",
     },
 }
 

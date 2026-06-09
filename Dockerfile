@@ -15,7 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-ENV PYTHONUNBUFFERED=1 PORT=8080
+# FORWARDED_ALLOW_IPS=*: trust Fly's proxy X-Forwarded-Proto so the app knows it's
+# served over HTTPS (correct scheme in any generated URL / redirect).
+ENV PYTHONUNBUFFERED=1 PORT=8080 FORWARDED_ALLOW_IPS=*
 EXPOSE 8080
 
 # gunicorn process manager + uvicorn ASGI workers. 2 workers on a shared-cpu-1x.

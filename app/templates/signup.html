@@ -1,30 +1,25 @@
 {% extends "base.html" %}
-
-{% block title %}Sign Up — ogforge{% endblock %}
-
+{% block title %}Get started — Snapcard{% endblock %}
 {% block content %}
 <section class="auth-section">
-    <div class="auth-container">
-        <div class="auth-card">
-            <h2>Create Your Account</h2>
-            {% if error %}
-                <div class="alert alert-error">{{ error }}</div>
-            {% endif %}
-            <form method="post" class="auth-form">
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" required autofocus>
-                </div>
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                <button type="submit" class="btn btn-primary btn-full">Sign Up</button>
-            </form>
-            <p class="auth-footer">
-                Already have an account? <a href="/login">Log in</a>
-            </p>
+    <div class="auth-card reveal in">
+        <div class="auth-head">
+            <h2>Create your account</h2>
+            <p class="auth-tag">Free forever for 50 cards a month. Your API key is ready in seconds.</p>
         </div>
+        {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+        <form method="post" class="auth-form">
+            <label class="field">
+                <span>Email</span>
+                <input type="email" name="email" required autofocus autocomplete="email" placeholder="you@company.com">
+            </label>
+            <label class="field">
+                <span>Password</span>
+                <input type="password" name="password" required autocomplete="new-password" placeholder="At least 6 characters" minlength="6">
+            </label>
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Create account →</button>
+        </form>
+        <p class="auth-footer">Already have an account? <a href="/login">Log in</a></p>
     </div>
 </section>
 {% endblock %}

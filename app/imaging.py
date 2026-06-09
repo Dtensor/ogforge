@@ -173,7 +173,7 @@ def render_og_image(title: str, subtitle: str = "", template: str = "default",
 
     # Draw watermark if enabled
     if watermark:
-        watermark_text = "ogforge.dev"
+        watermark_text = "snapcard.dev"
         bbox = draw.textbbox((0, 0), watermark_text, font=watermark_font)
         wm_width = bbox[2] - bbox[0]
         wm_height = bbox[3] - bbox[1]

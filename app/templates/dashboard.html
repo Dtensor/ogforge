@@ -1,82 +1,79 @@
 {% extends "base.html" %}
-
-{% block title %}Dashboard — ogforge{% endblock %}
-
+{% block title %}Dashboard — Snapcard{% endblock %}
 {% block content %}
-<section class="dashboard-section">
-    <div class="dashboard-container">
-        <h1>Dashboard</h1>
+<section class="dash">
+    <div class="dash-head reveal in">
+        <div>
+            <h1>Dashboard</h1>
+            <p class="dash-sub">{{ email }}</p>
+        </div>
+        <span class="plan-badge plan-badge-{{ plan }}">{{ plan_label }}{% if plan == 'pro' and pro_until %} · until {{ pro_until[:10] }}{% endif %}</span>
+    </div>
 
-        {% if msg %}
-            <div class="alert alert-info">{{ msg }}</div>
+    {% if msg %}<div class="alert alert-info">{{ msg }}</div>{% endif %}
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+    <div class="dash-grid">
+        <!-- API key -->
+        <div class="card span-2">
+            <h2>Your API key</h2>
+            <p class="muted small">Send this on every request. Keep it secret — regenerating revokes the old one.</p>
+            <div class="key-row">
+                <code class="api-key" id="apikey">{{ api_key }}</code>
+                <button class="btn btn-ghost btn-small" onclick="navigator.clipboard.writeText('{{ api_key }}');this.textContent='Copied ✓';setTimeout(()=>this.textContent='Copy',1400)">Copy</button>
+            </div>
+            <form method="post" action="/dashboard/regenerate-key" style="margin-top:14px">
+                <button type="submit" class="btn btn-secondary btn-small">↻ Regenerate key</button>
+            </form>
+        </div>
+
+        <!-- Usage -->
+        <div class="card">
+            <h2>This month</h2>
+            <div class="usage-num"><b>{{ used }}</b> <span class="muted">/ {{ "{:,}".format(limit) }}</span></div>
+            <div class="progress-bar"><div class="progress-fill" style="width: {{ ((used / limit * 100) if limit else 0) | round(1) }}%"></div></div>
+            <p class="muted small">images generated · resets monthly</p>
+        </div>
+
+        <!-- Plan / upgrade -->
+        {% if plan == 'free' %}
+        <div class="card card-accent">
+            <h2>Upgrade to Pro</h2>
+            <p class="muted small">₹750 for 1 month — 5,000 images, no watermark, custom colors.</p>
+            <form method="post" action="/upgrade" style="margin-top:14px">
+                <button type="submit" class="btn btn-primary btn-block">Upgrade — ₹750/mo</button>
+            </form>
+        </div>
+        {% else %}
+        <div class="card card-accent">
+            <h2>Pro is active ✓</h2>
+            {% if pro_until %}<p class="muted small">Runs until <b>{{ pro_until[:10] }}</b>. Renew to extend a month.</p>{% endif %}
+            <form method="post" action="/upgrade" style="margin-top:14px">
+                <button type="submit" class="btn btn-primary btn-block">Renew — ₹750/mo</button>
+            </form>
+        </div>
         {% endif %}
-        {% if error %}
-            <div class="alert alert-error">{{ error }}</div>
-        {% endif %}
 
-        <div class="dashboard-grid">
-            <!-- Account Info -->
-            <div class="dashboard-card">
-                <h2>Account</h2>
-                <div class="account-info">
-                    <p><strong>Email:</strong> {{ email }}</p>
-                    <p><strong>Plan:</strong> <span class="plan-badge plan-badge-{{ plan }}">{{ plan_label }}</span></p>
-                </div>
+        <!-- Live sample -->
+        <div class="card span-2">
+            <h2>Your sample card</h2>
+            <div class="browser-frame sm">
+                <div class="browser-bar"><span></span><span></span><span></span></div>
+                <img src="{{ sample_url }}" alt="Your sample card" class="sample-image">
             </div>
+        </div>
 
-            <!-- API Key -->
-            <div class="dashboard-card">
-                <h2>API Key</h2>
-                <p class="api-key-label">Your active key:</p>
-                <code class="api-key">{{ api_key }}</code>
-                <form method="post" action="/dashboard/regenerate-key" class="regenerate-form">
-                    <button type="submit" class="btn btn-secondary btn-small">Regenerate Key</button>
-                </form>
-            </div>
-
-            <!-- Usage -->
-            <div class="dashboard-card">
-                <h2>Monthly Usage</h2>
-                <div class="usage-info">
-                    <p><strong>{{ used }} / {{ limit }}</strong> images generated</p>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ (used / limit * 100) | int }}%"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sample Image -->
-            <div class="dashboard-card">
-                <h2>Sample Image</h2>
-                <img src="{{ sample_url }}" alt="Sample OG image" class="sample-image">
-            </div>
-
-            <!-- cURL Example -->
-            <div class="dashboard-card">
-                <h2>Try It Out</h2>
-                <pre class="curl-snippet">{{ curl_snippet }}</pre>
-            </div>
-
-            <!-- Upgrade / Pro status -->
-            {% if plan == 'free' %}
-            <div class="dashboard-card">
-                <h2>Upgrade to Pro</h2>
-                <p>₹750 for 1 month: 5,000 images, no watermarks, and custom colors.</p>
-                <form method="post" action="/upgrade">
-                    <button type="submit" class="btn btn-primary">Upgrade to Pro — ₹750/mo</button>
-                </form>
-            </div>
-            {% elif plan == 'pro' %}
-            <div class="dashboard-card">
-                <h2>Pro is active ✓</h2>
-                {% if pro_until %}<p>Your Pro access runs until <strong>{{ pro_until[:10] }}</strong>.</p>{% endif %}
-                <p>Renew anytime to extend by another month.</p>
-                <form method="post" action="/upgrade">
-                    <button type="submit" class="btn btn-primary">Renew — ₹750/mo</button>
-                </form>
-            </div>
-            {% endif %}
+        <!-- cURL -->
+        <div class="card span-2">
+            <h2>Try it from your terminal</h2>
+            <pre class="code-block-inline">{{ curl_snippet }}</pre>
         </div>
     </div>
 </section>
+{% endblock %}
+{% block scripts %}
+<script>
+  const io = new IntersectionObserver((es)=>es.forEach(x=>{if(x.isIntersecting)x.target.classList.add('in')}),{threshold:0.1});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
 {% endblock %}

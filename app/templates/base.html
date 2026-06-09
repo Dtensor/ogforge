@@ -3,31 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}ogforge — Dynamic OG Images{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+    <title>{% block title %}Snapcard — Instant social cards for every link{% endblock %}</title>
+    <meta name="description" content="Snapcard turns any title into a beautiful 1200×630 social preview image via a simple API. Free to start.">
+    <!-- Relative URL: inherits the page's https scheme (no mixed-content block behind a TLS proxy). -->
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖼️</text></svg>">
 </head>
 <body>
+    <div class="bg-orbs" aria-hidden="true"><span></span><span></span><span></span></div>
     <nav class="navbar">
         <div class="nav-container">
-            <a href="/" class="navbar-logo">ogforge</a>
+            <a href="/" class="navbar-logo"><span class="logo-mark">◳</span> Snapcard</a>
             <div class="nav-links">
                 {% if request.session.get('user_id') %}
                     <a href="/dashboard" class="nav-link">Dashboard</a>
-                    <a href="/logout" class="nav-link">Logout</a>
+                    <a href="/logout" class="nav-link">Log out</a>
                 {% else %}
-                    <a href="/login" class="nav-link">Login</a>
-                    <a href="/signup" class="nav-link nav-link-signup">Sign Up</a>
+                    <a href="/login" class="nav-link">Log in</a>
+                    <a href="/signup" class="nav-link nav-link-signup">Get started</a>
                 {% endif %}
             </div>
         </div>
     </nav>
-
     <main>
         {% block content %}{% endblock %}
     </main>
-
     <footer class="footer">
-        <p>&copy; 2026 ogforge. All rights reserved.</p>
+        <div class="footer-inner">
+            <span class="footer-brand"><span class="logo-mark">◳</span> Snapcard</span>
+            <span class="footer-muted">© 2026 Snapcard · Instant social cards for every link</span>
+        </div>
     </footer>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

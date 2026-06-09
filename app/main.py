@@ -20,7 +20,7 @@ log = logging.getLogger("ogforge")
 
 def create_app() -> FastAPI:
     """Application factory. Used by uvicorn (module-level `app`) and by tests."""
-    app = FastAPI(title="ogforge", description="Dynamic OG image API", version="1.0.0")
+    app = FastAPI(title="Snapcard", description="Instant social cards for every link", version="1.0.0")
     app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
     app.mount("/static", StaticFiles(directory="app/static"), name="static")
 

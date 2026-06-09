@@ -1,26 +1,17 @@
 {% extends "base.html" %}
-
-{% block title %}Payment Successful — ogforge{% endblock %}
-
+{% block title %}Payment received — Snapcard{% endblock %}
 {% block content %}
-<section class="success-section">
-    <div class="success-container">
-        <div class="success-card">
-            <h1 class="success-title">✓ Payment Successful</h1>
-            <p class="success-message">Thank you for upgrading to Pro!</p>
-            <p class="success-details">
-                We've received your payment. Your account will be activated shortly when our webhook confirms the subscription.
-                You'll get access to:
-            </p>
-            <ul class="success-benefits">
-                <li>5,000 images per month</li>
-                <li>Remove watermarks</li>
-                <li>Custom colors on all templates</li>
-            </ul>
-            <p class="success-footer">
-                In the meantime, return to your <a href="/dashboard" class="link">dashboard</a> to start generating images.
-            </p>
-        </div>
+<section class="auth-section">
+    <div class="auth-card success-card reveal in">
+        <div class="success-check">✓</div>
+        <h2>Payment received</h2>
+        <p class="auth-tag">Thanks for going Pro! Your account activates the moment our webhook confirms the payment (usually instant).</p>
+        <ul class="success-benefits">
+            <li>✓ 5,000 images / month</li>
+            <li>✓ No watermark</li>
+            <li>✓ Custom colors on every template</li>
+        </ul>
+        <a href="/dashboard" class="btn btn-primary btn-block btn-lg">Go to dashboard →</a>
     </div>
 </section>
 {% endblock %}
