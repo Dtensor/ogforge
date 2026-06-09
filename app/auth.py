@@ -5,6 +5,7 @@ import hashlib
 import secrets
 import sqlite3
 
+from . import db as _db
 from .db import utcnow
 
 
@@ -48,13 +49,16 @@ def create_user(db: sqlite3.Connection, email: str, password: str) -> int:
     """
     try:
         password_hash = hash_password(password)
-        cursor = db.execute(
+        user_id = db.insert_returning_id(
             "INSERT INTO users (email, password_hash, plan, created_at) VALUES (?, ?, ?, ?)",
             (email, password_hash, "free", utcnow()),
         )
         db.commit()
-        return cursor.lastrowid
-    except sqlite3.IntegrityError:
+        return user_id
+    except _db.INTEGRITY_ERRORS:
+        # Postgres aborts the transaction on a constraint violation — roll back so the
+        # connection is reusable, then surface the same ValueError the routes expect.
+        db.rollback()
         raise ValueError("email exists")
 
 

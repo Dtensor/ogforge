@@ -1,7 +1,7 @@
 """Web routes: landing, auth (signup/login/logout), dashboard, billing callbacks."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Body, Depends, Form, Header, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 import sqlite3
@@ -23,7 +23,7 @@ def _current_user(request: Request, db: sqlite3.Connection) -> dict | None:
 
 
 @router.get("/")
-async def landing(request: Request):
+def landing(request: Request):
     """Landing page: hero + pricing."""
     return templates.TemplateResponse(
         "landing.html",
@@ -35,13 +35,13 @@ async def landing(request: Request):
 
 
 @router.get("/signup")
-async def signup_get(request: Request):
+def signup_get(request: Request):
     """Signup form."""
     return templates.TemplateResponse("signup.html", {"request": request})
 
 
 @router.post("/signup")
-async def signup_post(
+def signup_post(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
@@ -63,13 +63,13 @@ async def signup_post(
 
 
 @router.get("/login")
-async def login_get(request: Request):
+def login_get(request: Request):
     """Login form."""
     return templates.TemplateResponse("login.html", {"request": request})
 
 
 @router.post("/login")
-async def login_post(
+def login_post(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
@@ -88,14 +88,14 @@ async def login_post(
 
 
 @router.get("/logout")
-async def logout(request: Request):
+def logout(request: Request):
     """Clear session, redirect home."""
     request.session.clear()
     return RedirectResponse(url="/", status_code=303)
 
 
 @router.get("/dashboard")
-async def dashboard(
+def dashboard(
     request: Request,
     db: sqlite3.Connection = Depends(get_db),
 ):
@@ -130,7 +130,7 @@ async def dashboard(
 
 
 @router.post("/dashboard/regenerate-key")
-async def regenerate_key(
+def regenerate_key(
     request: Request,
     db: sqlite3.Connection = Depends(get_db),
 ):
@@ -144,7 +144,7 @@ async def regenerate_key(
 
 
 @router.post("/upgrade")
-async def upgrade(
+def upgrade(
     request: Request,
     db: sqlite3.Connection = Depends(get_db),
 ):
@@ -171,7 +171,7 @@ async def upgrade(
 
 
 @router.get("/billing/success")
-async def billing_success(request: Request):
+def billing_success(request: Request):
     """Stripe redirect after successful checkout."""
     return templates.TemplateResponse(
         "success.html",
@@ -182,22 +182,25 @@ async def billing_success(request: Request):
 
 
 @router.get("/billing/cancel")
-async def billing_cancel(request: Request):
+def billing_cancel(request: Request):
     """Stripe redirect after user cancels checkout."""
     return RedirectResponse(url="/dashboard", status_code=303)
 
 
 @router.post("/billing/webhook")
-async def billing_webhook(
-    request: Request,
+def billing_webhook(
+    payload: bytes = Body(default=b""),
+    stripe_signature: str | None = Header(default=None),
     db: sqlite3.Connection = Depends(get_db),
 ):
-    """Handle Stripe webhook."""
-    body = await request.body()
-    sig_header = request.headers.get("stripe-signature")
+    """Handle Stripe webhook.
 
+    Sync (not async) so the sync DB driver (psycopg) runs in the threadpool on the
+    same thread as get_db. The raw body is read via Body(bytes) instead of
+    `await request.body()`, since signature verification needs the exact bytes.
+    """
     try:
-        return billing.handle_webhook(db, body, sig_header)
+        return billing.handle_webhook(db, payload, stripe_signature)
     except ValueError as e:
         # Must be a real 4xx so Stripe records the failure and retries.
         return JSONResponse(status_code=400, content={"error": str(e)})

@@ -1,0 +1,28 @@
+# ogforge — Fly.io deploy config (SQLite on a persistent volume).
+# A Fly volume attaches to exactly ONE machine, so ogforge runs as a single machine;
+# the 2 gunicorn workers in it share the WAL-mode SQLite file. DATABASE_URL is left
+# unset, so app/db.py uses the SQLite path at DB_PATH. (Postgres support remains in
+# db.py for a future migration when write concurrency demands it.)
+app = "ogforge"
+primary_region = "sjc"
+
+[build]
+
+[env]
+  DB_PATH = "/data/ogforge.db"
+  # BASE_URL is set as a secret/override at deploy once the real *.fly.dev name is known.
+
+[mounts]
+  source = "ogforge_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1   # single machine: the volume can only attach to one
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

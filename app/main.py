@@ -10,9 +10,13 @@ from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
 
+import logging
+
 from .config import settings
-from .db import init_db
+from .db import _database_url, _get_pool, _is_pg, init_db
 from . import routes_api, routes_web
+
+log = logging.getLogger("ogforge")
 
 def create_app() -> FastAPI:
     """Application factory. Used by uvicorn (module-level `app`) and by tests."""
@@ -26,6 +30,13 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def _startup() -> None:
         init_db()
+        # Warm the Postgres pool now (lifespan context), so request handlers borrow
+        # already-open connections instead of calling psycopg.connect() inside the
+        # threadpool while the event loop runs (which intermittently blocks).
+        if _is_pg(_database_url()):
+            pool = _get_pool()
+            pool.wait(timeout=20)
+            log.warning("pg pool ready: %s", pool.get_stats())
 
     @app.get("/healthz", include_in_schema=False)
     def healthz() -> dict:
