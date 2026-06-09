@@ -123,7 +123,7 @@ def dashboard(
             "limit": limit,
             "sample_url": sample_url,
             "curl_snippet": curl_snippet,
-            "stripe_enabled": settings.stripe_enabled,
+            "stripe_enabled": settings.razorpay_enabled,
             "msg": request.query_params.get("msg"),
         },
     )
@@ -148,15 +148,14 @@ def upgrade(
     request: Request,
     db: sqlite3.Connection = Depends(get_db),
 ):
-    """Redirect to Stripe checkout or flash error if not configured."""
+    """Redirect to Razorpay checkout or flash error if not configured."""
     user = _current_user(request, db)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    if not settings.stripe_enabled:
-        # Redirect to dashboard with error message
+    if not settings.razorpay_enabled:
         return RedirectResponse(
-            url="/dashboard?msg=Stripe%20not%20configured%20%E2%80%94%20set%20keys%20in%20.env",
+            url="/dashboard?msg=Razorpay%20not%20configured%20%E2%80%94%20set%20keys%20in%20.env",
             status_code=303,
         )
 
@@ -165,14 +164,14 @@ def upgrade(
         return RedirectResponse(url=session_url, status_code=303)
     except RuntimeError:
         return RedirectResponse(
-            url="/dashboard?msg=Stripe%20not%20configured%20%E2%80%94%20set%20keys%20in%20.env",
+            url="/dashboard?msg=Razorpay%20not%20configured%20%E2%80%94%20set%20keys%20in%20.env",
             status_code=303,
         )
 
 
 @router.get("/billing/success")
 def billing_success(request: Request):
-    """Stripe redirect after successful checkout."""
+    """Razorpay redirect after successful checkout."""
     return templates.TemplateResponse(
         "success.html",
         {
@@ -183,7 +182,7 @@ def billing_success(request: Request):
 
 @router.get("/billing/cancel")
 def billing_cancel(request: Request):
-    """Stripe redirect after user cancels checkout."""
+    """Razorpay redirect after user cancels checkout."""
     return RedirectResponse(url="/dashboard", status_code=303)
 
 
@@ -192,17 +191,17 @@ async def billing_webhook(
     request: Request,
     db: sqlite3.Connection = Depends(get_db),
 ):
-    """Handle Stripe webhook.
+    """Handle Razorpay webhook.
 
-    Async so we can read the EXACT raw body bytes (await request.body()) that Stripe's
+    Async so we can read the EXACT raw body bytes (await request.body()) that Razorpay's
     signature is computed over — FastAPI's Body() parsing mangles/validates the payload
-    (returns 422 on real Stripe POSTs). DB access here is SQLite, which tolerates the
+    (returns 422 on real Razorpay POSTs). DB access here is SQLite, which tolerates the
     dependency/handler thread split (check_same_thread=False).
     """
     payload = await request.body()
-    sig_header = request.headers.get("stripe-signature")
+    sig_header = request.headers.get("x-razorpay-signature")
     try:
         return billing.handle_webhook(db, payload, sig_header)
     except ValueError as e:
-        # Must be a real 4xx so Stripe records the failure and retries.
+        # Must be a real 4xx so Razorpay records the failure and retries.
         return JSONResponse(status_code=400, content={"error": str(e)})

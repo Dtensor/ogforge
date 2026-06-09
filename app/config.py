@@ -31,14 +31,15 @@ class Settings:
     db_path: str
     secret_key: str
     base_url: str
-    stripe_secret_key: str
-    stripe_publishable_key: str
-    stripe_price_id: str
-    stripe_webhook_secret: str
+    # Razorpay (India-friendly INR subscriptions). Test keys: rzp_test_…, live: rzp_live_…
+    razorpay_key_id: str
+    razorpay_key_secret: str
+    razorpay_plan_id: str
+    razorpay_webhook_secret: str
 
     @property
-    def stripe_enabled(self) -> bool:
-        return bool(self.stripe_secret_key and self.stripe_price_id)
+    def razorpay_enabled(self) -> bool:
+        return bool(self.razorpay_key_id and self.razorpay_key_secret and self.razorpay_plan_id)
 
 
 def get_settings() -> Settings:
@@ -47,10 +48,10 @@ def get_settings() -> Settings:
         db_path=os.environ.get("DB_PATH", "ogforge.db"),
         secret_key=os.environ.get("SESSION_SECRET", "dev-secret-change-me"),
         base_url=os.environ.get("BASE_URL", "http://localhost:8810").rstrip("/"),
-        stripe_secret_key=os.environ.get("STRIPE_SECRET_KEY", ""),
-        stripe_publishable_key=os.environ.get("STRIPE_PUBLISHABLE_KEY", ""),
-        stripe_price_id=os.environ.get("STRIPE_PRICE_ID", ""),
-        stripe_webhook_secret=os.environ.get("STRIPE_WEBHOOK_SECRET", ""),
+        razorpay_key_id=os.environ.get("RAZORPAY_KEY_ID", ""),
+        razorpay_key_secret=os.environ.get("RAZORPAY_KEY_SECRET", ""),
+        razorpay_plan_id=os.environ.get("RAZORPAY_PLAN_ID", ""),
+        razorpay_webhook_secret=os.environ.get("RAZORPAY_WEBHOOK_SECRET", ""),
     )
 
 

@@ -1,7 +1,7 @@
 """ogforge — Dynamic Open-Graph / social-card image API (SaaS).
 
 Boots a FastAPI app that serves a marketing/dashboard frontend (routes_web) and a
-key-authenticated image API (routes_api). Monetization (Stripe subscription + webhook
+key-authenticated image API (routes_api). Monetization (Razorpay subscription + webhook
 reconciliation) lives in billing.py and is wired through routes_web.
 """
 from __future__ import annotations
@@ -40,7 +40,7 @@ def create_app() -> FastAPI:
 
     @app.get("/healthz", include_in_schema=False)
     def healthz() -> dict:
-        return {"status": "ok", "stripe_enabled": settings.stripe_enabled}
+        return {"status": "ok", "razorpay_enabled": settings.razorpay_enabled}
 
     return app
 

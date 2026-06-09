@@ -479,12 +479,12 @@ class TestWebhookHTTP:
         row = db.execute("SELECT id FROM users WHERE email = ?", ("hook@example.com",)).fetchone()
         uid = row["id"]
         payload = {
-            "type": "checkout.session.completed",
-            "data": {"object": {"client_reference_id": str(uid), "customer": "cus_http"}},
+            "event": "subscription.activated",
+            "payload": {"subscription": {"entity": {"id": "sub_http", "notes": {"user_id": str(uid)}}}},
         }
-        # No STRIPE_WEBHOOK_SECRET in tests -> dev unsigned path. Must be 200, not 422.
+        # No RAZORPAY_WEBHOOK_SECRET in tests -> dev unsigned path. Must be 200, not 422.
         resp = client.post("/billing/webhook", json=payload)
         assert resp.status_code == 200
-        assert resp.json()["handled"] == "checkout.session.completed"
+        assert resp.json()["handled"] == "subscription.activated"
         plan = db.execute("SELECT plan FROM users WHERE id = ?", (uid,)).fetchone()["plan"]
         assert plan == "pro"
