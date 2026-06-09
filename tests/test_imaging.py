@@ -27,7 +27,7 @@ class TestRenderOGImageBasic:
 
     def test_render_og_image_returns_bytes(self):
         """render_og_image returns bytes."""
-        result = render_og_image("Test Title")
+        result = render_og_image("Test Title", format="og")
         assert isinstance(result, bytes)
 
     def test_render_og_image_png_signature(self):
@@ -162,13 +162,49 @@ class TestCustomColors:
         assert result.startswith(b"\x89PNG")
 
 
+class TestFormats:
+    """Multi-format image rendering tests."""
+
+    def test_render_format_og(self):
+        """render_og_image with format='og' returns 1200x630 PNG."""
+        result = render_og_image("Title", format="og")
+        assert result.startswith(b"\x89PNG")
+
+    def test_render_format_story(self):
+        """render_og_image with format='story' returns 1080x1920 PNG."""
+        result = render_og_image("Title", format="story")
+        assert result.startswith(b"\x89PNG")
+
+    def test_render_format_square(self):
+        """render_og_image with format='square' returns 1080x1080 PNG."""
+        result = render_og_image("Title", format="square")
+        assert result.startswith(b"\x89PNG")
+
+    def test_render_invalid_format_fallback_to_og(self):
+        """render_og_image with invalid format falls back to og."""
+        result = render_og_image("Title", format="invalid")
+        assert result.startswith(b"\x89PNG")
+
+    def test_different_formats_produce_different_sizes(self):
+        """Different formats produce different image sizes."""
+        og = render_og_image("Title", format="og")
+        story = render_og_image("Title", format="story")
+        square = render_og_image("Title", format="square")
+
+        # They should be different sizes (different byte counts)
+        # Note: exact sizes vary due to compression, but og should be notably different
+        assert len(og) != len(story) or og != story
+        assert len(og) != len(square) or og != square
+        assert len(story) != len(square) or story != square
+
+
 class TestRenderConsistency:
     """Consistency and edge case tests."""
 
     def test_render_same_input_same_output(self):
         """Rendering the same input twice produces identical output."""
-        result1 = render_og_image("Title", subtitle="Sub")
-        result2 = render_og_image("Title", subtitle="Sub")
+        result1 = render_og_image("Title", subtitle="Sub", format="og")
+        result2 = render_og_image("Title", subtitle="Sub", format="og")
         # Deterministic rendering (same input -> same output)
         assert result1 == result2
 

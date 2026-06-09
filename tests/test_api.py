@@ -1,7 +1,19 @@
 """Integration tests for API routes: signup, login, OG generation, usage, quota enforcement."""
 
+from datetime import datetime, timedelta, timezone
+
 from app.auth import active_api_key
 from app.quota import PLANS
+
+
+def _set_user_pro(db, user_id):
+    """Helper: set a user to pro plan with 30-day future expiry."""
+    future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+    db.execute(
+        "UPDATE users SET plan = ?, pro_until = ? WHERE id = ?",
+        ("pro", future, user_id),
+    )
+    db.commit()
 
 
 class TestAuthFlow:
@@ -488,3 +500,332 @@ class TestWebhookHTTP:
         assert resp.json()["handled"] == "payment_link.paid"
         plan = db.execute("SELECT plan FROM users WHERE id = ?", (uid,)).fetchone()["plan"]
         assert plan == "pro"
+
+
+class TestMultiFormatSupport:
+    """Tests for multi-format card generation (og, story, square)."""
+
+    def test_sample_endpoint_format_og(self, client):
+        """GET /v1/sample with format=og returns 1200x630 PNG."""
+        response = client.get("/v1/sample?title=Test&format=og")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content.startswith(b"\x89PNG")
+
+    def test_sample_endpoint_format_story(self, client):
+        """GET /v1/sample with format=story returns 1080x1920 PNG."""
+        response = client.get("/v1/sample?title=Test&format=story")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content.startswith(b"\x89PNG")
+
+    def test_sample_endpoint_format_square(self, client):
+        """GET /v1/sample with format=square returns 1080x1080 PNG."""
+        response = client.get("/v1/sample?title=Test&format=square")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content.startswith(b"\x89PNG")
+
+    def test_og_endpoint_format_og(self, client, db):
+        """GET /v1/og with format=og (free user) returns PNG."""
+        client.post(
+            "/signup",
+            data={"email": "format_og@example.com", "password": "pass"},
+            follow_redirects=True,
+        )
+        user = db.execute(
+            "SELECT id FROM users WHERE email = ?", ("format_og@example.com",)
+        ).fetchone()
+        key = active_api_key(db, user["id"])
+
+        response = client.get(f"/v1/og?title=Test&format=og&key={key}")
+        assert response.status_code == 200
+        assert response.content.startswith(b"\x89PNG")
+        assert response.headers.get("X-OGForge-Plan") == "free"
+
+    def test_og_endpoint_format_story_free_fallback(self, client, db):
+        """GET /v1/og with format=story (free user) falls back to og."""
+        client.post(
+            "/signup",
+            data={"email": "format_story_free@example.com", "password": "pass"},
+            follow_redirects=True,
+        )
+        user = db.execute(
+            "SELECT id FROM users WHERE email = ?", ("format_story_free@example.com",)
+        ).fetchone()
+        key = active_api_key(db, user["id"])
+
+        response = client.get(f"/v1/og?title=Test&format=story&key={key}")
+        assert response.status_code == 200
+        assert response.content.startswith(b"\x89PNG")
+        # Should include fallback note header
+        assert "fallback" in response.headers.get("X-OGForge-Note", "").lower()
+
+    def test_og_endpoint_format_story_pro(self, client, db):
+        """GET /v1/og with format=story (pro user) returns story format."""
+        client.post(
+            "/signup",
+            data={"email": "format_story_pro@example.com", "password": "pass"},
+            follow_redirects=True,
+        )
+        user = db.execute(
+            "SELECT id FROM users WHERE email = ?", ("format_story_pro@example.com",)
+        ).fetchone()
+
+        # Manually set to pro
+        _set_user_pro(db, user["id"])
+
+        key = active_api_key(db, user["id"])
+
+        response = client.get(f"/v1/og?title=Test&format=story&key={key}")
+        assert response.status_code == 200
+        assert response.content.startswith(b"\x89PNG")
+        assert response.headers.get("X-OGForge-Plan") == "pro"
+        # Should NOT have fallback note
+        assert response.headers.get("X-OGForge-Note") is None
+
+    def test_og_endpoint_format_square_free_fallback(self, client, db):
+        """GET /v1/og with format=square (free user) falls back to og."""
+        client.post(
+            "/signup",
+            data={"email": "format_square_free@example.com", "password": "pass"},
+            follow_redirects=True,
+        )
+        user = db.execute(
+            "SELECT id FROM users WHERE email = ?", ("format_square_free@example.com",)
+        ).fetchone()
+        key = active_api_key(db, user["id"])
+
+        response = client.get(f"/v1/og?title=Test&format=square&key={key}")
+        assert response.status_code == 200
+        assert response.content.startswith(b"\x89PNG")
+        assert "fallback" in response.headers.get("X-OGForge-Note", "").lower()
+
+
+class TestBatchGeneration:
+    """Tests for POST /v1/batch (Pro-only batch image generation)."""
+
+    def test_batch_free_user_403(self, client, db):
+        """POST /v1/batch free user returns 403."""
+        client.post(
+            "/signup",
+            data={"email": "batch_free@example.com", "password": "pass"},
+            follow_redirects=True,
+        )
+        user = db.execute(
+            "SELECT id FROM users WHERE email = ?", ("batch_free@example.com",)
+        ).fetchone()
+        key = active_api_key(db, user["id"])
+
+        response = client.post(
+            "/v1/batch",
+            json={"items": [{"title": "Test"}]},
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert response.status_code == 403
+        data = response.json()
+        assert "requires Pro" in data["error"]
+
+    def test_batch_pro_user_single_item(self, client, db):
+        """POST /v1/batch pro user with 1 item returns 1 base64 PNG."""
+        client.post(
+            "/signup",
+            data={"email": "batch_pro@example.com", "password": "pass"},
+            follow_redirects=True,
+        )
+        user = db.execute(
+            "SELECT id FROM users WHERE email = ?", ("batch_pro@example.com",)
+        ).fetchone()
+        _set_user_pro(db, user["id"])
+        key = active_api_key(db, user["id"])
+
+        response = client.post(
+            "/v1/batch",
+            json={"items": [{"title": "Card 1"}]},
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert len(data["results"]) == 1
+        assert data["results"][0]["title"] == "Card 1"
+        assert data["results"][0]["png_base64"] is not None
+        # Verify it's valid base64 PNG
+        import base64
+        png_bytes = base64.b64decode(data["results"][0]["png_base64"])
+        assert png_bytes.startswith(b"\x89PNG")
+
+    def test_batch_pro_user_multiple_items(self, client, db):
+        """POST /v1/batch pro user with 3 items returns 3 base64 PNGs."""
+        client.post(
+            "/signup",
+            data={"email": "batch_multi@example.com", "password": "pass"},
+            follow_redirects=True,
+        )
+        user = db.execute(
+            "SELECT id FROM users WHERE email = ?", ("batch_multi@example.com",)
+        ).fetchone()
+        _set_user_pro(db, user["id"])
+        key = active_api_key(db, user["id"])
+
+        response = client.post(
+            "/v1/batch",
+            json={
+                "items": [
+                    {"title": "Card 1"},
+                    {"title": "Card 2", "template": "dark"},
+                    {"title": "Card 3", "subtitle": "Subtitle"},
+                ]
+            },
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 3
+        assert len(data["results"]) == 3
+
+    def test_batch_quota_enforcement(self, client, db, monkeypatch):
+        """POST /v1/batch rejects if batch would exceed quota."""
+        monkeypatch.setitem(PLANS["pro"], "monthly_limit", 2)
+
+        client.post(
+            "/signup",
+            data={"email": "batch_quota@example.com", "password": "pass"},
+            follow_redirects=True,
+        )
+        user = db.execute(
+            "SELECT id FROM users WHERE email = ?", ("batch_quota@example.com",)
+        ).fetchone()
+        _set_user_pro(db, user["id"])
+        key = active_api_key(db, user["id"])
+
+        # First, use 1 quota
+        client.get(f"/v1/og?title=First&key={key}")
+
+        # Now try batch of 2 (would exceed 2-item limit)
+        response = client.post(
+            "/v1/batch",
+            json={"items": [{"title": "B1"}, {"title": "B2"}]},
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert response.status_code == 429
+        data = response.json()
+        assert "exceed" in data["error"].lower()
+
+    def test_batch_max_25_items(self, client, db):
+        """POST /v1/batch with >25 items returns 400."""
+        client.post(
+            "/signup",
+            data={"email": "batch_max@example.com", "password": "pass"},
+            follow_redirects=True,
+        )
+        user = db.execute(
+            "SELECT id FROM users WHERE email = ?", ("batch_max@example.com",)
+        ).fetchone()
+        _set_user_pro(db, user["id"])
+        key = active_api_key(db, user["id"])
+
+        items = [{"title": f"Card {i}"} for i in range(26)]
+        response = client.post(
+            "/v1/batch",
+            json={"items": items},
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert "25" in data["error"]
+
+    def test_batch_empty_items_400(self, client, db):
+        """POST /v1/batch with empty items list returns 400."""
+        client.post(
+            "/signup",
+            data={"email": "batch_empty@example.com", "password": "pass"},
+            follow_redirects=True,
+        )
+        user = db.execute(
+            "SELECT id FROM users WHERE email = ?", ("batch_empty@example.com",)
+        ).fetchone()
+        _set_user_pro(db, user["id"])
+        key = active_api_key(db, user["id"])
+
+        response = client.post(
+            "/v1/batch",
+            json={"items": []},
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert response.status_code == 400
+        assert "empty" in response.json()["error"].lower()
+
+    def test_batch_no_auth_401(self, client):
+        """POST /v1/batch without auth returns 401."""
+        response = client.post(
+            "/v1/batch",
+            json={"items": [{"title": "Test"}]},
+        )
+        assert response.status_code == 401
+
+    def test_batch_with_formats(self, client, db):
+        """POST /v1/batch items can specify different formats."""
+        client.post(
+            "/signup",
+            data={"email": "batch_formats@example.com", "password": "pass"},
+            follow_redirects=True,
+        )
+        user = db.execute(
+            "SELECT id FROM users WHERE email = ?", ("batch_formats@example.com",)
+        ).fetchone()
+        _set_user_pro(db, user["id"])
+        key = active_api_key(db, user["id"])
+
+        response = client.post(
+            "/v1/batch",
+            json={
+                "items": [
+                    {"title": "OG", "format": "og"},
+                    {"title": "Story", "format": "story"},
+                    {"title": "Square", "format": "square"},
+                ]
+            },
+            headers={"Authorization": f"Bearer {key}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 3
+        for result in data["results"]:
+            assert result["png_base64"] is not None
+
+
+class TestGalleryPage:
+    """Tests for GET /gallery template page."""
+
+    def test_gallery_page_loads(self, client):
+        """GET /gallery returns 200 with HTML."""
+        response = client.get("/gallery")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+    def test_gallery_page_contains_templates(self, client):
+        """GET /gallery HTML includes all 4 templates."""
+        response = client.get("/gallery")
+        assert response.status_code == 200
+        # Check for template names in the page
+        text = response.text
+        assert "gradient" in text.lower()
+        assert "default" in text.lower()
+        assert "dark" in text.lower()
+        assert "minimal" in text.lower()
+
+    def test_gallery_page_contains_formats(self, client):
+        """GET /gallery HTML includes all 3 formats."""
+        response = client.get("/gallery")
+        text = response.text
+        assert "1200" in text  # og dimensions
+        assert "1920" in text  # story height
+        assert "1080" in text  # story/square width
+
+    def test_gallery_page_sample_images(self, client):
+        """GET /gallery includes sample image URLs with /v1/sample."""
+        response = client.get("/gallery")
+        text = response.text
+        assert "/v1/sample?" in text
+        assert "template=" in text

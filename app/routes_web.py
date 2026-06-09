@@ -1,6 +1,8 @@
 """Web routes: landing, auth (signup/login/logout), dashboard, billing callbacks."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -11,7 +13,11 @@ from .config import settings
 from .db import get_db
 
 router = APIRouter(tags=["web"])
-templates = Jinja2Templates(directory="app/templates")
+
+# Resolve template directory (works from any CWD)
+app_dir = Path(__file__).parent
+templates_dir = app_dir / "templates"
+templates = Jinja2Templates(directory=str(templates_dir))
 
 
 def _current_user(request: Request, db: sqlite3.Connection) -> dict | None:
@@ -30,6 +36,36 @@ def landing(request: Request):
         {
             "request": request,
             "plans": quota.PLANS,
+        },
+    )
+
+
+@router.get("/gallery")
+def gallery(request: Request):
+    """Gallery page: showcase all templates and formats with live samples.
+
+    SEO-friendly public discovery page showing the 4 templates and 3 formats.
+    """
+    # Sample headlines for gallery items
+    samples = [
+        {"title": "The Art of API Design", "template": "gradient"},
+        {"title": "Ship Faster with Snapcard", "template": "default"},
+        {"title": "Social cards, powered by AI", "template": "dark"},
+        {"title": "One line to gorgeous cards", "template": "minimal"},
+    ]
+
+    formats = [
+        {"name": "og", "label": "Desktop (1200×630)", "width": 1200, "height": 630},
+        {"name": "story", "label": "Stories (1080×1920)", "width": 1080, "height": 1920},
+        {"name": "square", "label": "Square (1080×1080)", "width": 1080, "height": 1080},
+    ]
+
+    return templates.TemplateResponse(
+        "gallery.html",
+        {
+            "request": request,
+            "samples": samples,
+            "formats": formats,
         },
     )
 

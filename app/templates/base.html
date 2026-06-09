@@ -15,6 +15,7 @@
         <div class="nav-container">
             <a href="/" class="navbar-logo"><span class="logo-mark">◳</span> Snapcard</a>
             <div class="nav-links">
+                <a href="/gallery" class="nav-link">Gallery</a>
                 {% if request.session.get('user_id') %}
                     <a href="/dashboard" class="nav-link">Dashboard</a>
                     <a href="/logout" class="nav-link">Log out</a>

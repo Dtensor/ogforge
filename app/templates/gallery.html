@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Template Gallery — Snapcard{% endblock %}
+{% block content %}
+<section class="gallery-hero">
+    <div class="gallery-head reveal">
+        <h1>Template Gallery</h1>
+        <p>See all four templates and three formats in action. Choose the style that matches your brand.</p>
+    </div>
+</section>
+
+<!-- Gallery Grid -->
+<section class="gallery-section">
+    <div class="gallery-grid">
+        {% for sample in samples %}
+        <div class="gallery-card reveal">
+            <h3>{{ sample.template | capitalize }}</h3>
+            <div class="gallery-tabs">
+                {% for format in formats %}
+                <button class="gallery-tab {% if format.name == 'og' %}is-active{% endif %}" data-format="{{ format.name }}">
+                    {{ format.label }}
+                </button>
+                {% endfor %}
+            </div>
+            <div class="gallery-preview-container">
+                <img
+                    class="gallery-preview"
+                    alt="{{ sample.title }} in {{ sample.template }} template"
+                    src="/v1/sample?title={{ sample.title | urlencode }}&template={{ sample.template }}&format=og"
+                    data-base-url="/v1/sample?title={{ sample.title | urlencode }}&template={{ sample.template }}&format="
+                    loading="lazy"
+                >
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="gallery-cta reveal">
+    <h2>Ready to ship?</h2>
+    <p>Pick your template, get your API key, and start generating cards.</p>
+    <a href="/signup" class="btn btn-primary btn-lg">Create free account →</a>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const cards = document.querySelectorAll('.gallery-card');
+  cards.forEach(card => {
+    const tabs = card.querySelectorAll('.gallery-tab');
+    const img = card.querySelector('.gallery-preview');
+    const baseUrl = img.dataset.baseUrl;
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const format = tab.dataset.format;
+        tabs.forEach(t => t.classList.remove('is-active'));
+        tab.classList.add('is-active');
+        img.src = baseUrl + format;
+      });
+    });
+  });
+
+  // Intersection observer for reveal animations
+  const io = new IntersectionObserver((es) => es.forEach(x => { if (x.isIntersecting) x.target.classList.add('in'); }), {threshold: 0.12});
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+})();
+</script>
+{% endblock %}

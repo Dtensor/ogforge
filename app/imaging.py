@@ -90,10 +90,20 @@ def _wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFon
     return lines
 
 
+def _get_format_dimensions(format: str) -> tuple[int, int]:
+    """Return (width, height) for format. Defaults to og (1200x630)."""
+    formats = {
+        "og": (1200, 630),
+        "story": (1080, 1920),
+        "square": (1080, 1080),
+    }
+    return formats.get(format, (1200, 630))
+
+
 def render_og_image(title: str, subtitle: str = "", template: str = "default",
                     bg: str | None = None, fg: str | None = None,
-                    watermark: bool = True) -> bytes:
-    """Render a 1200x630 Open-Graph image with title and subtitle.
+                    watermark: bool = True, format: str = "og") -> bytes:
+    """Render an Open-Graph image with title and subtitle, supporting multiple formats.
 
     Args:
         title: Main heading text
@@ -101,7 +111,8 @@ def render_og_image(title: str, subtitle: str = "", template: str = "default",
         template: One of TEMPLATES (default to "default" if invalid)
         bg: Hex color override for background (#RRGGBB), ignored if invalid
         fg: Hex color override for foreground text (#RRGGBB), ignored if invalid
-        watermark: If True, add "ogforge.dev" watermark
+        watermark: If True, add "snapcard.dev" watermark
+        format: Format preset: "og" (1200x630, default), "story" (1080x1920), "square" (1080x1080)
 
     Returns:
         PNG bytes
@@ -117,8 +128,11 @@ def render_og_image(title: str, subtitle: str = "", template: str = "default",
     bg_color = bg if _is_valid_hex_color(bg) else palette_bg
     fg_color = fg if _is_valid_hex_color(fg) else palette_fg
 
+    # Get dimensions from format
+    width, height = _get_format_dimensions(format)
+
     # Create canvas
-    img = Image.new("RGB", (1200, 630), color=bg_color)
+    img = Image.new("RGB", (width, height), color=bg_color)
 
     # Apply gradient for gradient template
     if template == "gradient":
@@ -129,14 +143,15 @@ def render_og_image(title: str, subtitle: str = "", template: str = "default",
 
     draw = ImageDraw.Draw(img)
 
-    # Load fonts
-    title_font = _load_font(72)
-    subtitle_font = _load_font(36)
-    watermark_font = _load_font(20)
+    # Scale fonts based on canvas height (story/square are taller, scale up)
+    scale_factor = height / 630
+    title_font = _load_font(int(72 * scale_factor))
+    subtitle_font = _load_font(int(36 * scale_factor))
+    watermark_font = _load_font(int(20 * scale_factor))
 
     # Wrap and render title
-    padding = 60
-    max_text_width = 1200 - 2 * padding
+    padding = int(60 * min(width / 1200, 1))  # Don't over-pad narrow formats
+    max_text_width = width - 2 * padding
 
     title_lines = _wrap_text(draw, title, title_font, max_text_width)
 
@@ -147,13 +162,13 @@ def render_og_image(title: str, subtitle: str = "", template: str = "default",
         title_height += bbox[3] - bbox[1]
 
     # Draw title centered
-    y = 80
+    y = int(80 * scale_factor)
     for line in title_lines:
         bbox = draw.textbbox((0, 0), line, font=title_font)
         line_height = bbox[3] - bbox[1]
-        x = (1200 - (bbox[2] - bbox[0])) // 2
+        x = (width - (bbox[2] - bbox[0])) // 2
         draw.text((x, y), line, fill=fg_color, font=title_font)
-        y += line_height + 10
+        y += line_height + int(10 * scale_factor)
 
     # Draw subtitle if provided
     if subtitle:
@@ -167,9 +182,9 @@ def render_og_image(title: str, subtitle: str = "", template: str = "default",
                 dim_color = "#999999"
             else:
                 dim_color = "#666666"
-            x = (1200 - (bbox[2] - bbox[0])) // 2
+            x = (width - (bbox[2] - bbox[0])) // 2
             draw.text((x, y), line, fill=dim_color, font=subtitle_font)
-            y += line_height + 5
+            y += line_height + int(5 * scale_factor)
 
     # Draw watermark if enabled
     if watermark:
@@ -177,8 +192,8 @@ def render_og_image(title: str, subtitle: str = "", template: str = "default",
         bbox = draw.textbbox((0, 0), watermark_text, font=watermark_font)
         wm_width = bbox[2] - bbox[0]
         wm_height = bbox[3] - bbox[1]
-        wm_x = 1200 - wm_width - 20
-        wm_y = 630 - wm_height - 15
+        wm_x = width - wm_width - int(20 * scale_factor)
+        wm_y = height - wm_height - int(15 * scale_factor)
         # Dim watermark
         watermark_color = "#666666" if fg_color == "#ffffff" else "#cccccc"
         draw.text((wm_x, wm_y), watermark_text, fill=watermark_color, font=watermark_font)
