@@ -56,8 +56,8 @@ def get_og_image(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    # Check quota
-    plan = user["plan"]
+    # Check quota (effective_plan honors the one-time Pro expiry)
+    plan = quota.effective_plan(user)
     allowed, used, limit = quota.check_quota(db, user["id"], plan)
     if not allowed:
         return JSONResponse(
@@ -116,8 +116,8 @@ def get_usage(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    # Get plan and usage
-    plan = user["plan"]
+    # Get plan and usage (effective_plan honors the one-time Pro expiry)
+    plan = quota.effective_plan(user)
     plan_config = quota.plan_of(plan)
     used = quota.usage_this_month(db, user["id"])
     limit = plan_config["monthly_limit"]

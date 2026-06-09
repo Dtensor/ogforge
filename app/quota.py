@@ -33,6 +33,21 @@ def plan_of(plan: str | None) -> dict:
     return PLANS.get(plan or "free", PLANS["free"])
 
 
+def effective_plan(user: dict) -> str:
+    """The user's plan RIGHT NOW, honoring the one-time Pro expiry (pro_until).
+
+    Pro is sold as a 30-day window (Razorpay one-time payment). A user is 'pro' only
+    while plan=='pro' AND pro_until is in the future; otherwise they're effectively 'free'.
+    pro_until is an ISO-8601 UTC string, so lexical comparison against utcnow() is valid.
+    """
+    if user.get("plan") == "pro":
+        until = user.get("pro_until")
+        if until and until > utcnow():
+            return "pro"
+        return "free"
+    return "free"
+
+
 def _month_prefix() -> str:
     """e.g. '2026-06' — UTC calendar month, matches ISO timestamps stored in usage.ts."""
     now = datetime.now(timezone.utc)

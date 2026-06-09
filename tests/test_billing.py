@@ -1,16 +1,17 @@
-"""Tests for Razorpay billing webhook handling (no live API, no network).
+"""Tests for Razorpay one-time billing (Payment Link = 30 days of Pro).
 
-The dev path (no RAZORPAY_WEBHOOK_SECRET set, as in the test env) skips signature
-verification, so we can feed synthetic subscription events and assert the plan flips.
-Mapping webhook -> user is via the subscription's notes.user_id.
+Dev path (no RAZORPAY_WEBHOOK_SECRET in the test env) skips signature verification,
+so we feed synthetic payment_link.paid events and assert Pro is granted with an expiry.
 """
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from app.auth import create_user
 from app.billing import handle_webhook
 from app.db import connect, init_db
+from app.quota import effective_plan
 
 
 @pytest.fixture
@@ -21,14 +22,14 @@ def db():
     conn.close()
 
 
-def _event(event_type: str, user_id, sub_id="sub_test123") -> bytes:
+def _paid_event(user_id, link_id="plink_test") -> bytes:
     payload = {
-        "event": event_type,
+        "event": "payment_link.paid",
         "payload": {
-            "subscription": {
+            "payment_link": {
                 "entity": {
-                    "id": sub_id,
-                    "status": "active",
+                    "id": link_id,
+                    "status": "paid",
                     "notes": {"user_id": str(user_id)} if user_id is not None else {},
                 }
             }
@@ -37,42 +38,55 @@ def _event(event_type: str, user_id, sub_id="sub_test123") -> bytes:
     return json.dumps(payload).encode("utf-8")
 
 
-class TestSubscriptionActivation:
-    def test_activated_flips_user_to_pro(self, db):
-        uid = create_user(db, "activate@example.com", "pw")
-        result = handle_webhook(db, _event("subscription.activated", uid), sig_header=None)
-        assert result["handled"] == "subscription.activated"
-        plan = db.execute("SELECT plan FROM users WHERE id = ?", (uid,)).fetchone()["plan"]
-        assert plan == "pro"
+class TestPaymentGrantsPro:
+    def test_paid_grants_pro_with_future_expiry(self, db):
+        uid = create_user(db, "paid@example.com", "pw")
+        result = handle_webhook(db, _paid_event(uid), sig_header=None)
+        assert result["handled"] == "payment_link.paid"
+        row = db.execute("SELECT plan, pro_until FROM users WHERE id = ?", (uid,)).fetchone()
+        assert row["plan"] == "pro"
+        assert row["pro_until"] is not None
+        assert datetime.fromisoformat(row["pro_until"]) > datetime.now(timezone.utc)
 
-    def test_charged_flips_user_to_pro(self, db):
-        uid = create_user(db, "charged@example.com", "pw")
-        handle_webhook(db, _event("subscription.charged", uid), sig_header=None)
-        assert db.execute("SELECT plan FROM users WHERE id = ?", (uid,)).fetchone()["plan"] == "pro"
+    def test_paid_makes_effective_plan_pro(self, db):
+        uid = create_user(db, "eff@example.com", "pw")
+        handle_webhook(db, _paid_event(uid), sig_header=None)
+        user = db.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+        assert effective_plan(dict(user)) == "pro"
+
+    def test_second_payment_extends_window(self, db):
+        uid = create_user(db, "extend@example.com", "pw")
+        handle_webhook(db, _paid_event(uid), sig_header=None)
+        first = db.execute("SELECT pro_until FROM users WHERE id = ?", (uid,)).fetchone()["pro_until"]
+        handle_webhook(db, _paid_event(uid), sig_header=None)
+        second = db.execute("SELECT pro_until FROM users WHERE id = ?", (uid,)).fetchone()["pro_until"]
+        # paying again before expiry pushes the window further out (stacks, not resets)
+        assert datetime.fromisoformat(second) > datetime.fromisoformat(first)
 
 
-class TestSubscriptionCancellation:
-    def test_cancelled_flips_user_to_free(self, db):
-        uid = create_user(db, "cancel@example.com", "pw")
-        handle_webhook(db, _event("subscription.activated", uid), sig_header=None)
-        assert db.execute("SELECT plan FROM users WHERE id = ?", (uid,)).fetchone()["plan"] == "pro"
-        handle_webhook(db, _event("subscription.cancelled", uid), sig_header=None)
-        assert db.execute("SELECT plan FROM users WHERE id = ?", (uid,)).fetchone()["plan"] == "free"
+class TestEffectivePlanExpiry:
+    def test_expired_pro_is_effectively_free(self):
+        past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        assert effective_plan({"plan": "pro", "pro_until": past}) == "free"
+
+    def test_future_pro_is_pro(self):
+        future = (datetime.now(timezone.utc) + timedelta(days=5)).isoformat()
+        assert effective_plan({"plan": "pro", "pro_until": future}) == "pro"
+
+    def test_pro_with_no_until_is_free(self):
+        assert effective_plan({"plan": "pro", "pro_until": None}) == "free"
+
+    def test_free_is_free(self):
+        assert effective_plan({"plan": "free", "pro_until": None}) == "free"
 
 
 class TestWebhookEdgeCases:
     def test_ignored_event(self, db):
-        result = handle_webhook(db, _event("payment.captured", None), sig_header=None)
-        assert result["handled"] == "ignored"
+        assert handle_webhook(db, _paid_event(None, "x").replace(b"payment_link.paid", b"payment.failed"), sig_header=None)["handled"] == "ignored"
 
     def test_missing_user_id_does_not_crash(self, db):
-        result = handle_webhook(db, _event("subscription.activated", None), sig_header=None)
-        assert result["status"] == "ok"
-
-    def test_nonexistent_user_id_does_not_crash(self, db):
-        result = handle_webhook(db, _event("subscription.activated", 99999), sig_header=None)
-        assert result["status"] == "ok"
+        assert handle_webhook(db, _paid_event(None), sig_header=None)["status"] == "ok"
 
     def test_malformed_json_raises(self, db):
         with pytest.raises(ValueError):
-            handle_webhook(db, b"not valid json {", sig_header=None)
+            handle_webhook(db, b"not json {", sig_header=None)

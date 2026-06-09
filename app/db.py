@@ -56,7 +56,7 @@ def _schema_statements(is_pg: bool) -> list[str]:
             email               TEXT UNIQUE NOT NULL,
             password_hash       TEXT NOT NULL,
             plan                TEXT NOT NULL DEFAULT 'free',
-            stripe_customer_id  TEXT,
+            pro_until           TEXT,
             created_at          TEXT NOT NULL
         )""",
         f"""CREATE TABLE IF NOT EXISTS api_keys (
@@ -250,6 +250,13 @@ def init_db() -> None:
     try:
         for stmt in _schema_statements(db.is_pg):
             db.execute(stmt)
+        # Migrate: add pro_until to pre-existing users tables (created before this column).
+        if db.is_pg:
+            db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS pro_until TEXT")
+        else:
+            cols = [r["name"] for r in db.execute("PRAGMA table_info(users)").fetchall()]
+            if "pro_until" not in cols:
+                db.execute("ALTER TABLE users ADD COLUMN pro_until TEXT")
         db.commit()
     finally:
         db.close()

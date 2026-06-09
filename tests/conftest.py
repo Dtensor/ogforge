@@ -6,7 +6,7 @@ from pathlib import Path
 # Module-level: runs at conftest import (BEFORE test modules import app.config),
 # so the suite never picks up a real .env on disk and Stripe stays disabled.
 os.environ["OGFORGE_DISABLE_DOTENV"] = "1"
-for _k in ("RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET", "RAZORPAY_PLAN_ID", "RAZORPAY_WEBHOOK_SECRET"):
+for _k in ("RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET", "RAZORPAY_WEBHOOK_SECRET"):
     os.environ[_k] = ""
 os.environ.setdefault("SESSION_SECRET", "test-secret-key")
 

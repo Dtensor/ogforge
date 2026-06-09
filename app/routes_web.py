@@ -104,8 +104,8 @@ def dashboard(
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    # Compute usage
-    plan = user["plan"]
+    # Compute usage (effective_plan honors the one-time Pro expiry)
+    plan = quota.effective_plan(user)
     allowed, used, limit = quota.check_quota(db, user["id"], plan)
     key = auth.active_api_key(db, user["id"])
 
@@ -124,6 +124,7 @@ def dashboard(
             "sample_url": sample_url,
             "curl_snippet": curl_snippet,
             "stripe_enabled": settings.razorpay_enabled,
+            "pro_until": user.get("pro_until") if plan == "pro" else None,
             "msg": request.query_params.get("msg"),
         },
     )

@@ -31,15 +31,15 @@ class Settings:
     db_path: str
     secret_key: str
     base_url: str
-    # Razorpay (India-friendly INR subscriptions). Test keys: rzp_test_…, live: rzp_live_…
+    # Razorpay (India-friendly INR). One-time Payment Link = 1 month of Pro.
+    # Test keys: rzp_test_…, live: rzp_live_… (Subscriptions API is gated separately.)
     razorpay_key_id: str
     razorpay_key_secret: str
-    razorpay_plan_id: str
     razorpay_webhook_secret: str
 
     @property
     def razorpay_enabled(self) -> bool:
-        return bool(self.razorpay_key_id and self.razorpay_key_secret and self.razorpay_plan_id)
+        return bool(self.razorpay_key_id and self.razorpay_key_secret)
 
 
 def get_settings() -> Settings:
@@ -50,7 +50,6 @@ def get_settings() -> Settings:
         base_url=os.environ.get("BASE_URL", "http://localhost:8810").rstrip("/"),
         razorpay_key_id=os.environ.get("RAZORPAY_KEY_ID", ""),
         razorpay_key_secret=os.environ.get("RAZORPAY_KEY_SECRET", ""),
-        razorpay_plan_id=os.environ.get("RAZORPAY_PLAN_ID", ""),
         razorpay_webhook_secret=os.environ.get("RAZORPAY_WEBHOOK_SECRET", ""),
     )
 
