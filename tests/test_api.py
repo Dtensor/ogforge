@@ -462,3 +462,29 @@ class TestFullFlowIntegration:
         # new key should work
         response2 = client.get(f"/v1/og?title=Test&key={key2}")
         assert response2.status_code == 200
+
+
+class TestWebhookHTTP:
+    """Exercise the POST /billing/webhook HTTP route end-to-end (not just handle_webhook).
+
+    Regression guard: an earlier Body(bytes) signature returned 422 on real Stripe POSTs.
+    """
+
+    def test_webhook_http_flips_user_to_pro(self, client, db):
+        client.post(
+            "/signup",
+            data={"email": "hook@example.com", "password": "pw"},
+            follow_redirects=False,
+        )
+        row = db.execute("SELECT id FROM users WHERE email = ?", ("hook@example.com",)).fetchone()
+        uid = row["id"]
+        payload = {
+            "type": "checkout.session.completed",
+            "data": {"object": {"client_reference_id": str(uid), "customer": "cus_http"}},
+        }
+        # No STRIPE_WEBHOOK_SECRET in tests -> dev unsigned path. Must be 200, not 422.
+        resp = client.post("/billing/webhook", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["handled"] == "checkout.session.completed"
+        plan = db.execute("SELECT plan FROM users WHERE id = ?", (uid,)).fetchone()["plan"]
+        assert plan == "pro"

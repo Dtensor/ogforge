@@ -1,7 +1,7 @@
 """Web routes: landing, auth (signup/login/logout), dashboard, billing callbacks."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, Form, Header, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 import sqlite3
@@ -188,19 +188,21 @@ def billing_cancel(request: Request):
 
 
 @router.post("/billing/webhook")
-def billing_webhook(
-    payload: bytes = Body(default=b""),
-    stripe_signature: str | None = Header(default=None),
+async def billing_webhook(
+    request: Request,
     db: sqlite3.Connection = Depends(get_db),
 ):
     """Handle Stripe webhook.
 
-    Sync (not async) so the sync DB driver (psycopg) runs in the threadpool on the
-    same thread as get_db. The raw body is read via Body(bytes) instead of
-    `await request.body()`, since signature verification needs the exact bytes.
+    Async so we can read the EXACT raw body bytes (await request.body()) that Stripe's
+    signature is computed over — FastAPI's Body() parsing mangles/validates the payload
+    (returns 422 on real Stripe POSTs). DB access here is SQLite, which tolerates the
+    dependency/handler thread split (check_same_thread=False).
     """
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
     try:
-        return billing.handle_webhook(db, payload, stripe_signature)
+        return billing.handle_webhook(db, payload, sig_header)
     except ValueError as e:
         # Must be a real 4xx so Stripe records the failure and retries.
         return JSONResponse(status_code=400, content={"error": str(e)})
