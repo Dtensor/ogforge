@@ -1,6 +1,8 @@
 """Web routes: landing, auth (signup/login/logout), dashboard, billing callbacks."""
 from __future__ import annotations
 
+import secrets
+
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -8,7 +10,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 import sqlite3
 
-from . import auth, billing, quota
+from . import auth, billing, quota, google_oauth
 from .config import settings
 from .db import get_db
 
@@ -18,6 +20,7 @@ router = APIRouter(tags=["web"])
 app_dir = Path(__file__).parent
 templates_dir = app_dir / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
+templates.env.globals["google_enabled"] = google_oauth.enabled()
 
 
 def _current_user(request: Request, db: sqlite3.Connection) -> dict | None:
@@ -243,3 +246,35 @@ async def billing_webhook(
     except ValueError as e:
         # Must be a real 4xx so Razorpay records the failure and retries.
         return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+@router.get("/auth/google/login")
+def google_login(request: Request):
+    """Start Google sign-up/sign-in: redirect to Google's consent screen."""
+    if not google_oauth.enabled():
+        return RedirectResponse(url="/signup", status_code=303)
+    state = secrets.token_urlsafe(24)
+    request.session["oauth_state"] = state
+    return RedirectResponse(url=google_oauth.authorize_url(state), status_code=303)
+
+
+@router.get("/auth/google/callback")
+def google_callback(
+    request: Request,
+    code: str = "",
+    state: str = "",
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Google returns here; verify state, fetch email, create/login the user."""
+    expected = request.session.pop("oauth_state", None)
+    if not code or not state or state != expected:
+        return RedirectResponse(url="/signup", status_code=303)
+    try:
+        email = google_oauth.fetch_email(code)
+    except Exception:
+        email = None
+    if not email:
+        return RedirectResponse(url="/signup", status_code=303)
+    user = auth.get_or_create_oauth_user(db, email)
+    request.session["user_id"] = user["id"]
+    return RedirectResponse(url="/dashboard", status_code=303)

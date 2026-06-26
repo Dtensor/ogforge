@@ -36,6 +36,8 @@ class Settings:
     razorpay_key_id: str
     razorpay_key_secret: str
     razorpay_webhook_secret: str
+    google_client_id: str
+    google_client_secret: str
 
     @property
     def razorpay_enabled(self) -> bool:
@@ -51,6 +53,8 @@ def get_settings() -> Settings:
         razorpay_key_id=os.environ.get("RAZORPAY_KEY_ID", ""),
         razorpay_key_secret=os.environ.get("RAZORPAY_KEY_SECRET", ""),
         razorpay_webhook_secret=os.environ.get("RAZORPAY_WEBHOOK_SECRET", ""),
+        google_client_id=os.environ.get("GOOGLE_CLIENT_ID", ""),
+        google_client_secret=os.environ.get("GOOGLE_CLIENT_SECRET", ""),
     )
 
 

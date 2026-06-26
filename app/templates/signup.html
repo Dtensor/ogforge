@@ -19,6 +19,11 @@
             </label>
             <button type="submit" class="btn btn-primary btn-block btn-lg">Create account →</button>
         </form>
+    {% if google_enabled %}
+    <div class="oauth-divider">or</div>
+    <a href="/auth/google/login" class="btn btn-google">Sign up with Google</a>
+    {% endif %}
+
         <p class="auth-footer">Already have an account? <a href="/login">Log in</a></p>
     </div>
 </section>

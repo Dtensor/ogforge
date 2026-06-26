@@ -125,3 +125,22 @@ def active_api_key(db: sqlite3.Connection, user_id: int) -> str | None:
         (user_id,),
     ).fetchone()
     return row["key"] if row else None
+
+
+def get_or_create_oauth_user(db: sqlite3.Connection, email: str) -> dict:
+    """Find a user by email, or create a passwordless (OAuth-only) account.
+
+    OAuth users get an empty password_hash, so verify_password always fails — they can
+    only sign in via the provider. New accounts get an API key on creation; returning
+    users keep theirs (no rotation).
+    """
+    row = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if row:
+        return dict(row)
+    user_id = db.insert_returning_id(
+        "INSERT INTO users (email, password_hash, plan, created_at) VALUES (?, ?, ?, ?)",
+        (email, "", "free", utcnow()),
+    )
+    db.commit()
+    create_api_key(db, user_id)
+    return dict(db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone())
